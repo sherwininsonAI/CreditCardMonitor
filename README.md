@@ -1,10 +1,10 @@
 # Ledgerly — Credit Card Monitor
 
-A lightweight credit-card finance dashboard that runs in a web browser.
+A lightweight credit-card finance dashboard that runs in a web browser and stores each signed-in user's records in Firebase Cloud Firestore.
 
 ## Open the app
 
-Open `index.html` in a modern browser. No installation, account, or build step is required. Spreadsheet and OCR import features download their processing libraries from public CDNs on first use, so they need internet access initially.
+Serve the project through Firebase Hosting (see **Firebase setup** below). The app uses Firebase Authentication and Firestore, so it cannot be opened directly with `file://`. Spreadsheet, OCR, and Firebase SDK libraries are loaded from public CDNs and need internet access.
 
 ## Features
 
@@ -27,7 +27,45 @@ Open `index.html` in a modern browser. No installation, account, or build step i
 
 ## Data and privacy
 
-Records are saved in this browser's local storage and are not sent to a server. They are not automatically shared with another browser or device. This app does not connect to banks or submit payments; it is a manual tracking tool. For your safety, enter only a card nickname and its last four digits—never a full card number, security code, or PIN.
+Records are stored in Cloud Firestore under the signed-in user's Firebase UID. Firestore security rules restrict each active account to its own data and check a server-managed access record, so deactivation blocks Firestore access and signs out open app sessions as well as preventing future sign-ins. An administrator can create active accounts and deactivate accounts; users cannot self-register. An administrator account is a Firebase Authentication user with the `admin` custom claim, which is granted using the trusted Admin SDK bootstrap script—not from browser code. Passwords are managed by Firebase Authentication. A password reset link is available on the sign-in screen.
+
+The first time an account signs in with empty cloud storage, the app offers to migrate existing records from this browser's local storage. Migration copies the data to Firestore and leaves the local browser copy untouched. Other devices do not automatically import browser-local records.
+
+This app does not connect to banks or submit payments; it is a manual tracking tool. For your safety, enter only a card nickname and its last four digits—never a full card number, security code, or PIN.
+
+## Firebase setup
+
+1. Register a **Web app** in your Firebase project and place its `firebaseConfig` values in `firebase-config.js`. Firebase web configuration is visible to users; never put a service-account key or other private credential in that file.
+2. In Firebase Console, enable **Authentication → Email/Password**, and create a **Cloud Firestore** database.
+3. Install Node.js 20, the Firebase CLI, and the Google Cloud CLI (`gcloud`), then sign in:
+
+   ```powershell
+   npm install -g firebase-tools
+   firebase login
+   firebase use --add
+   ```
+
+   Select your project when prompted. Cloud Functions deployment requires a Firebase project on the Blaze billing plan. For local testing at `http://127.0.0.1:8765`, add `127.0.0.1` to **Authentication → Settings → Authorized domains** (add `localhost` too if you use that hostname).
+4. Deploy the Firestore ownership rules, account-management functions, and web app:
+
+   ```powershell
+   firebase deploy --only firestore:rules,functions,hosting
+   ```
+
+5. Create the first administrator in **Firebase Console → Authentication → Users**. From the `functions` folder, install its dependencies, authenticate the Firebase Admin SDK with Google Application Default Credentials, and set the project ID and administrator claim. Run these commands in the same PowerShell window:
+
+   ```powershell
+   cd functions
+   npm install
+   gcloud auth application-default login
+   $env:GCLOUD_PROJECT = "sherwin-ai"
+   node scripts/set-admin.js --email admin@example.com
+   ```
+
+   Replace `admin@example.com` with the email of an account that already exists in Firebase Authentication. The Google account used by `gcloud auth application-default login` must have permission to manage Firebase Authentication users and write to Firestore in this project. Sign out and back in after assigning the claim. Keep the administrator password and cloud credentials private. Accounts with the admin claim are protected from being disabled in the app; manage those accounts through trusted Firebase Console/Admin SDK access.
+6. Sign in as that administrator and use **Accounts** to create active accounts or activate/deactivate existing accounts. The administrator sets an initial temporary password; share it securely and have the user change it after signing in. Account creation and status changes run through admin-claim-protected Cloud Functions.
+
+For production, restrict the Firebase API key to your app's authorized domains and the APIs it needs. The Firestore rules intentionally grant users access only to documents beneath their own UID; do not replace them with open/test rules.
 
 Spreadsheet files and OCR both run in-browser; the statement file and extracted transaction data are not uploaded. Excel support and the PDF/OCR libraries are downloaded from public CDN URLs when first needed, so internet access is required on first use. For spreadsheets, map purchase date, description, and amount; optional post and due date columns can also be mapped. Excel date cells and common date strings are supported; choose month/day or day/month for ambiguous text dates. Review the preview before importing. OCR is approximate and remains available as a fallback; for the supported image statement layout, sale date maps to purchase date and post date is retained separately. Where available, the final peso-amount column is used. Set the app currency to match imported amounts; changing display currency does not convert them.
 

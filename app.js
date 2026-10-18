@@ -1,7 +1,22 @@
-(function () {
-  "use strict";
+import {
+  auth,
+  firebaseConfigReady,
+  loadCloudState,
+  saveCloudState,
+  watchUserAccess,
+  createManagedUser,
+  listManagedUsers,
+  setManagedUserEnabled
+} from "./firebase.js";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   const STORAGE_KEY = "ledgerly.credit-monitor.v1";
+  const blankFinanceState = () => ({ cards: [], people: [], transactions: [], payments: [], incomes: [], monthlyStatements: [], currency: "USD" });
   const pageTitles = {
     dashboard: "Overview",
     monthly: "Monthly sheet",
@@ -13,7 +28,14 @@
   };
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-  let state = loadState();
+  let state = blankFinanceState();
+  let activeUser = null;
+  let stopAccessWatch = null;
+  let isAdmin = false;
+  let persistedState = null;
+  let saveQueue = Promise.resolve();
+  let authMessage = "";
+  let authEmail = "";
   let activePage = "dashboard";
   let monthlyCardFilterId = sessionStorage.getItem("ledgerly.monthly-card-filter") || "";
   let monthlySheetViewMode = sessionStorage.getItem("ledgerly.monthly-sheet-view-mode") === "view" ? "view" : "edit";
@@ -26,37 +48,46 @@
   let transactionSearch = "";
   let importState = { fileName: "", rows: [], error: "", progress: "", busy: false, mode: "spreadsheet", spreadsheetHeaders: [], spreadsheetData: [], spreadsheetMapping: {}, dateOrder: "MDY" };
 
-  function loadState() {
+  function loadLocalState() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return { cards: [], people: [], transactions: [], payments: [], incomes: [], monthlyStatements: [], currency: "USD" };
-      const parsed = JSON.parse(stored);
-      return {
-        cards: Array.isArray(parsed.cards) ? parsed.cards.map((card, index) => {
-          const sortNo = Number(card.sortNo);
-          return { ...card, sortNo: Number.isInteger(sortNo) && sortNo >= 1 ? sortNo : index + 1 };
-        }) : [],
-        people: Array.isArray(parsed.people) ? parsed.people : [],
-        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-        payments: Array.isArray(parsed.payments) ? parsed.payments : [],
-        incomes: Array.isArray(parsed.incomes) ? parsed.incomes : [],
-        monthlyStatements: Array.isArray(parsed.monthlyStatements) ? parsed.monthlyStatements : [],
-        currency: ["USD", "PHP", "EUR", "GBP", "CAD", "AUD", "INR", "SGD"].includes(parsed.currency) ? parsed.currency : "USD"
-      };
+      if (!stored) return blankFinanceState();
+      return normalizeState(JSON.parse(stored));
     } catch (error) {
       console.error("Could not load saved finance data.", error);
-      return { cards: [], people: [], transactions: [], payments: [], incomes: [], monthlyStatements: [], currency: "USD" };
+      return blankFinanceState();
     }
   }
 
+  function normalizeState(parsed) {
+    return {
+      cards: Array.isArray(parsed.cards) ? parsed.cards.map((card, index) => {
+        const sortNo = Number(card.sortNo);
+        return { ...card, sortNo: Number.isInteger(sortNo) && sortNo >= 1 ? sortNo : index + 1 };
+      }) : [],
+      people: Array.isArray(parsed.people) ? parsed.people : [],
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+      payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+      incomes: Array.isArray(parsed.incomes) ? parsed.incomes : [],
+      monthlyStatements: Array.isArray(parsed.monthlyStatements) ? parsed.monthlyStatements : [],
+      currency: ["USD", "PHP", "EUR", "GBP", "CAD", "AUD", "INR", "SGD"].includes(parsed.currency) ? parsed.currency : "USD"
+    };
+  }
+
   function saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (error) {
-      console.error("Could not save finance data.", error);
-      toast("Could not save your changes. Check browser storage availability.", true);
+    if (!activeUser) {
+      toast("Sign in before saving changes.", true);
       return false;
     }
+    const uid = activeUser.uid;
+    const snapshot = JSON.parse(JSON.stringify(state));
+    saveQueue = saveQueue.then(async () => {
+      await saveCloudState(uid, snapshot, persistedState || blankFinanceState());
+      if (activeUser?.uid === uid) persistedState = snapshot;
+    }).catch((error) => {
+      console.error("Could not save finance data to Firebase.", error);
+      toast("Could not save your changes to the cloud. Check your connection and try again.", true);
+    });
     return true;
   }
 
@@ -374,6 +405,198 @@
     element.textContent = message;
     root.appendChild(element);
     window.setTimeout(() => element.remove(), 3000);
+  }
+
+  function renderAuthScreen() {
+    const root = document.getElementById("auth-view");
+    root.innerHTML = `<section class="auth-card">
+      <div class="brand auth-brand"><span class="brand-mark">L</span><span>ledgerly<span class="brand-period">.</span></span></div>
+      <h1>Sign in</h1>
+      <p class="page-subtitle">Sign in with an account created by your administrator.</p>
+      ${authMessage ? `<p class="auth-message" role="alert">${escapeHtml(authMessage)}</p>` : ""}
+      <form id="sign-in-form">
+        <label class="form-field"><span>Email</span><input type="email" name="email" autocomplete="username" value="${escapeHtml(authEmail)}" required></label>
+        <label class="form-field"><span>Password</span><span class="password-input-wrap"><input type="password" name="password" autocomplete="current-password" required><button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">Show</button></span></label>
+        <button class="button primary auth-submit" type="submit" ${firebaseConfigReady ? "" : "disabled"}>Sign in</button>
+        <button class="auth-reset" id="password-reset" type="button" ${firebaseConfigReady ? "" : "disabled"}>Forgot password?</button>
+      </form>
+      <p class="auth-footnote">New accounts are created and activated by an administrator.</p>
+    </section>`;
+    root.hidden = false;
+    document.querySelector(".app-shell").hidden = true;
+    bindPasswordToggles(root);
+    document.getElementById("sign-in-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('[type="submit"]');
+      button.disabled = true;
+      authEmail = form.elements.email.value.trim();
+      authMessage = "";
+      try {
+        await signInWithEmailAndPassword(auth, authEmail, form.elements.password.value);
+      } catch (error) {
+        console.error("Firebase sign-in failed.", error);
+        authMessage = error.code === "auth/unauthorized-domain"
+          ? "This site isn't authorized for Firebase sign-in. In Firebase Console → Authentication → Settings → Authorized domains, add 127.0.0.1, then reload this page."
+          : error.code === "auth/invalid-credential" || error.code === "auth/user-not-found" || error.code === "auth/wrong-password"
+            ? "Email or password is incorrect. Use the password set for this Firebase Authentication account, or select Forgot password?."
+            : error.code === "auth/user-disabled" ? "This account is inactive. Contact your administrator."
+              : error.code === "auth/invalid-api-key" ? "Firebase rejected the web API key. Check that firebase-config.js matches the sherwin-ai Web app."
+                : error.code === "auth/network-request-failed" ? "Firebase couldn't be reached. Check your internet connection and try again."
+                  : `Could not sign in (${error.code || "unknown error"}). Check the Firebase configuration and browser console.`;
+        renderAuthScreen();
+      } finally {
+        if (button.isConnected) button.disabled = false;
+      }
+    });
+    document.getElementById("password-reset").addEventListener("click", async () => {
+      authEmail = document.querySelector('#sign-in-form [name="email"]').value.trim();
+      if (!authEmail) {
+        authMessage = "Enter your email address first.";
+        renderAuthScreen();
+        return;
+      }
+      try {
+        await sendPasswordResetEmail(auth, authEmail);
+        authMessage = "If an account exists for that email, a password reset email has been sent.";
+      } catch (error) {
+        console.error("Firebase password reset failed.", error);
+        authMessage = "Could not send a password reset email. Check your Firebase email settings.";
+      }
+      renderAuthScreen();
+    });
+  }
+
+  async function handleAuthChange(user) {
+    const authRoot = document.getElementById("auth-view");
+    if (!user) {
+      if (stopAccessWatch) stopAccessWatch();
+      stopAccessWatch = null;
+      activeUser = null;
+      isAdmin = false;
+      persistedState = null;
+      state = blankFinanceState();
+      authEmail = "";
+      authMessage = firebaseConfigReady ? "" : "Add your Firebase web app values to firebase-config.js before signing in.";
+      document.querySelector(".app-shell").hidden = true;
+      document.getElementById("admin-account-button").hidden = true;
+      renderAuthScreen();
+      return;
+    }
+
+    activeUser = user;
+    if (stopAccessWatch) stopAccessWatch();
+    stopAccessWatch = null;
+    authRoot.hidden = true;
+    document.querySelector(".app-shell").hidden = false;
+    document.getElementById("account-email").textContent = user.email || "";
+    try {
+      const token = await user.getIdTokenResult(true);
+      isAdmin = token.claims.admin === true;
+      const cloudResult = await loadCloudState(user.uid);
+      if (activeUser?.uid !== user.uid) return;
+      state = normalizeState(cloudResult.state);
+      persistedState = JSON.parse(JSON.stringify(state));
+      if (!cloudResult.hasData) {
+        const legacyState = loadLocalState();
+        const hasLegacyData = legacyState.cards.length || legacyState.people.length ||
+          legacyState.transactions.length || legacyState.payments.length || legacyState.incomes.length ||
+          legacyState.monthlyStatements.length;
+        if (hasLegacyData && window.confirm("This browser has existing Ledgerly data, but this cloud account is empty. Migrate a copy of that data to this account? Your local browser copy will be kept.")) {
+          state = normalizeState(legacyState);
+          await saveCloudState(user.uid, state, blankFinanceState());
+          persistedState = JSON.parse(JSON.stringify(state));
+        }
+      }
+      document.getElementById("admin-account-button").hidden = !isAdmin;
+      document.getElementById("currency-select").value = state.currency;
+      render();
+      stopAccessWatch = watchUserAccess(user.uid, () => {
+        if (activeUser?.uid !== user.uid) return;
+        state = blankFinanceState();
+        authMessage = "This account is inactive. Contact your administrator.";
+        renderAuthScreen();
+        toast("This account is inactive. You have been signed out.", true);
+        signOut(auth).catch((error) => console.error("Could not sign out an inactive account.", error));
+      }, (error) => console.error("Could not monitor the account's active status.", error));
+    } catch (error) {
+      if (activeUser?.uid !== user.uid) return;
+      console.error("Could not load the signed-in user's Firebase data.", error);
+      await signOut(auth);
+      authMessage = "Could not load your account data. Check Firestore setup and security rules.";
+      renderAuthScreen();
+    }
+  }
+
+  async function showAdminPanel() {
+    if (!isAdmin) return;
+    const root = document.getElementById("modal-root");
+    root.innerHTML = `<div class="modal-backdrop" data-admin-close><section class="modal admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+      <div class="modal-header"><div><h2 id="admin-modal-title">Account maintenance</h2><p>Create accounts and activate or deactivate access.</p></div><button class="modal-close" type="button" data-admin-close aria-label="Close">×</button></div>
+      <div class="modal-form"><form id="admin-create-form"><div class="form-grid">
+        <label class="form-field full"><span>Email</span><input type="email" name="email" autocomplete="off" required></label>
+        <label class="form-field full"><span>Temporary password (at least 10 characters)</span><span class="password-input-wrap"><input type="password" name="password" minlength="10" autocomplete="new-password" required><button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">Show</button></span></label>
+      </div><div class="form-actions"><span></span><div class="form-actions-right"><button class="button primary" type="submit">Create active account</button></div></div></form>
+      <div id="admin-user-list" class="admin-user-list" aria-live="polite">Loading accounts…</div></div>
+    </section></div>`;
+    bindPasswordToggles(root);
+    root.querySelector("[data-admin-close]").addEventListener("click", (event) => {
+      if (event.target.hasAttribute("data-admin-close")) root.innerHTML = "";
+    });
+    const refreshUsers = async () => {
+      const list = root.querySelector("#admin-user-list");
+      list.textContent = "Loading accounts…";
+      try {
+        const users = await listManagedUsers();
+        list.innerHTML = users.map((user) => `<div class="admin-user-row"><div><strong>${escapeHtml(user.email || "(no email)")}</strong><small>${user.admin ? "Administrator" : user.disabled ? "Inactive" : "Active"}</small></div><button class="button small" type="button" data-user-uid="${escapeHtml(user.uid)}" data-enabled="${!user.disabled}" ${user.admin || user.uid === activeUser.uid ? "disabled" : ""}>${user.admin ? "Admin account" : user.disabled ? "Activate" : "Deactivate"}</button></div>`).join("") || '<p class="page-subtitle">No accounts found.</p>';
+        list.querySelectorAll("[data-user-uid]").forEach((button) => button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            await setManagedUserEnabled(button.dataset.userUid, button.dataset.enabled === "true");
+            toast("Account status updated.");
+            await refreshUsers();
+          } catch (error) {
+            console.error("Could not update account status.", error);
+            toast(error.message || "Could not update this account.", true);
+            button.disabled = false;
+          }
+        }));
+      } catch (error) {
+        console.error("Could not load managed accounts.", error);
+        list.textContent = "Could not load accounts. Confirm that the admin Cloud Function is deployed.";
+      }
+    };
+    root.querySelector("#admin-create-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submit = form.querySelector('[type="submit"]');
+      submit.disabled = true;
+      try {
+        await createManagedUser(form.elements.email.value.trim(), form.elements.password.value);
+        form.reset();
+        toast("Account created and active. Share its temporary password securely.");
+        await refreshUsers();
+      } catch (error) {
+        console.error("Could not create managed account.", error);
+        toast(error.message || "Could not create this account.", true);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    await refreshUsers();
+  }
+
+  function bindPasswordToggles(root) {
+    root.querySelectorAll("[data-password-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const input = button.parentElement.querySelector("input");
+        const isVisible = input.type === "text";
+        input.type = isVisible ? "password" : "text";
+        button.textContent = isVisible ? "Show" : "Hide";
+        button.setAttribute("aria-label", `${isVisible ? "Show" : "Hide"} password`);
+        button.setAttribute("aria-pressed", String(!isVisible));
+      });
+    });
   }
 
   function pageHeading(title, subtitle, actions) {
@@ -1575,5 +1798,15 @@
     state.currency = event.currentTarget.value;
     if (saveState()) render();
   });
-  render();
-}());
+  document.getElementById("admin-account-button").addEventListener("click", showAdminPanel);
+  document.getElementById("sign-out-button").addEventListener("click", async () => {
+    await saveQueue;
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Could not sign out of Firebase.", error);
+      toast("Could not sign out. Please try again.", true);
+    }
+  });
+  renderAuthScreen();
+  onAuthStateChanged(auth, (user) => { handleAuthChange(user); });

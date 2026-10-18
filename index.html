@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-shell">
+  <main id="auth-view" class="auth-view" hidden></main>
+  <div class="app-shell" hidden>
     <aside class="sidebar">
       <a class="brand" href="#" aria-label="Ledgerly home" data-page="dashboard">
         <span class="brand-mark">L</span>
@@ -27,7 +28,7 @@
         <button class="nav-link" data-page="people"><span class="nav-icon">♙</span>People &amp; income</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="privacy-note"><span class="privacy-icon">◈</span><div><strong>Your data stays yours</strong><p>Saved privately in this browser.</p></div></div>
+        <div class="privacy-note"><span class="privacy-icon">◈</span><div><strong>Your data stays yours</strong><p>Saved to your Firebase account.</p></div></div>
         <div class="sidebar-footer">LEDGERLY <span>·</span> FINANCE, IN FOCUS</div>
       </div>
     </aside>
@@ -35,13 +36,13 @@
     <main class="main-content">
       <header class="topbar">
         <div class="breadcrumb"><span>Personal finance</span><span class="crumb-slash">/</span><strong id="breadcrumb-current">Overview</strong></div>
-        <div class="topbar-right"><label class="currency-control">Currency <select id="currency-select" aria-label="Display currency"><option>USD</option><option>PHP</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>INR</option><option>SGD</option></select></label><span class="local-badge"><i></i> Private workspace</span><span class="avatar" aria-hidden="true">L</span></div>
+        <div class="topbar-right"><label class="currency-control">Currency <select id="currency-select" aria-label="Display currency"><option>USD</option><option>PHP</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>INR</option><option>SGD</option></select></label><button id="admin-account-button" class="button small" type="button" hidden>Accounts</button><span id="account-email" class="account-email"></span><button id="sign-out-button" class="button small" type="button">Sign out</button></div>
       </header>
       <div id="page-content" class="page-content"></div>
     </main>
   </div>
   <div id="modal-root"></div>
   <div id="toast-root" class="toast-root" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

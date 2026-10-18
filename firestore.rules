@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isActiveOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && exists(/databases/$(database)/documents/userAccess/$(userId))
+        && get(/databases/$(database)/documents/userAccess/$(userId)).data.active == true;
+    }
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if isActiveOwner(userId);
+    }
+
+    match /userAccess/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

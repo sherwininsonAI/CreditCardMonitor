@@ -17,7 +17,24 @@
 body { margin: 0; min-width: 320px; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
 .app-shell { min-height: 100vh; }
+[hidden] { display: none !important; }
+.auth-view { min-height: 100vh; display: grid; place-items: center; padding: 22px; background: #f5f7fb; }
+.auth-card { width: min(100%, 410px); padding: 34px; border: 1px solid #edf0f4; border-radius: 14px; background: #fff; box-shadow: 0 14px 45px #25345112; }
+.auth-brand { padding: 0; margin-bottom: 32px; }
+.auth-card h1 { font-size: 25px; }
+.auth-card form { display: grid; gap: 14px; margin-top: 25px; }
+.auth-card .form-field { gap: 7px; color: #687385; font-size: 11px; font-weight: 600; }
+.auth-card .form-field input { min-height: 42px; }
+.password-input-wrap { position: relative; display: block; }
+.password-input-wrap input { padding-right: 58px !important; }
+.password-toggle { position: absolute; top: 50%; right: 8px; padding: 5px; transform: translateY(-50%); border: 0; background: transparent; color: var(--purple); font-size: 10px; font-weight: 600; }
+.password-toggle:focus-visible { border-radius: 3px; outline: 2px solid var(--purple); outline-offset: 2px; }
+.auth-submit { justify-content: center; min-height: 40px; margin-top: 3px; }
+.auth-reset { border: 0; background: transparent; color: var(--purple); font-size: 11px; }
+.auth-footnote { margin: 20px 0 0; color: #929cab; font-size: 10px; text-align: center; }
+.auth-message { margin: 16px 0 0; padding: 10px; border-radius: 6px; background: #fff1f1; color: #a33f48; font-size: 11px; }
 .sidebar { width: 244px; background: var(--sidebar); border-right: 1px solid #edf0f4; position: fixed; inset: 0 auto 0 0; padding: 28px 17px 20px; display: flex; flex-direction: column; z-index: 3; }
 .brand { color: #202b3c; text-decoration: none; display: flex; align-items: center; gap: 10px; font: 800 22px "Segoe UI",Arial,sans-serif; letter-spacing: -.8px; padding: 0 10px; }
 .brand-mark { width: 31px; height: 31px; border-radius: 10px; background: #6458d9; color: #fff; display: grid; place-items: center; font: 800 17px "Segoe UI",Arial,sans-serif; box-shadow: 0 5px 12px #6458d936; }
@@ -49,6 +66,13 @@ button { cursor: pointer; }
 .local-badge { font-size: 10px; color: #8792a3; display: flex; align-items: center; gap: 7px; }
 .local-badge i { width: 6px; height: 6px; background: #35b786; border-radius: 50%; }
 .avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #efedff; color: #6358d4; font: 700 12px "Segoe UI",Arial,sans-serif; }
+.account-email { max-width: 180px; overflow: hidden; color: #687385; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-modal { width: min(100%, 560px); }
+.admin-user-list { display: grid; gap: 7px; margin-top: 19px; }
+.admin-user-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; border: 1px solid #edf0f4; border-radius: 7px; }
+.admin-user-row strong,.admin-user-row small { display: block; }
+.admin-user-row strong { overflow-wrap: anywhere; color: #394559; font-size: 11px; }
+.admin-user-row small { margin-top: 3px; color: #8792a3; font-size: 9px; }
 .page-content { max-width: 1440px; margin: 0 auto; padding: 34px 42px 52px; }
 .monthly-sheet-page { padding-top: 20px; }
 .monthly-sheet-page .page-heading { margin-bottom: 17px; }
