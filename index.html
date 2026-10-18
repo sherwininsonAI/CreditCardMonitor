@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Ledgerly — Credit card monitor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Ledgerly home" data-page="dashboard">
+        <span class="brand-mark">L</span>
+        <span>ledgerly<span class="brand-period">.</span></span>
+      </a>
+      <div class="workspace-label">PERSONAL FINANCE</div>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-link active" data-page="dashboard"><span class="nav-icon">◫</span>Overview</button>
+        <button class="nav-link" data-page="monthly"><span class="nav-icon">▦</span>Monthly sheet</button>
+        <button class="nav-link" data-page="transactions"><span class="nav-icon">↗</span>Transactions</button>
+        <button class="nav-link" data-page="import"><span class="nav-icon">⇧</span>Import statement</button>
+        <button class="nav-link" data-page="payments"><span class="nav-icon">↙</span>Payments</button>
+        <div class="nav-divider"></div>
+        <div class="nav-caption">MANAGE</div>
+        <button class="nav-link" data-page="cards"><span class="nav-icon">▣</span>My cards</button>
+        <button class="nav-link" data-page="people"><span class="nav-icon">♙</span>People &amp; income</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="privacy-note"><span class="privacy-icon">◈</span><div><strong>Your data stays yours</strong><p>Saved privately in this browser.</p></div></div>
+        <div class="sidebar-footer">LEDGERLY <span>·</span> FINANCE, IN FOCUS</div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="breadcrumb"><span>Personal finance</span><span class="crumb-slash">/</span><strong id="breadcrumb-current">Overview</strong></div>
+        <div class="topbar-right"><label class="currency-control">Currency <select id="currency-select" aria-label="Display currency"><option>USD</option><option>PHP</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>INR</option><option>SGD</option></select></label><span class="local-badge"><i></i> Private workspace</span><span class="avatar" aria-hidden="true">L</span></div>
+      </header>
+      <div id="page-content" class="page-content"></div>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
