@@ -295,7 +295,8 @@ td strong { color: #384456; font-weight: 600; }
 .monthly-sheet .sheet-total-row .sheet-unpaid { color: #ac554b; }
 .direct-monthly-sheet { min-width: 1700px; }
 .direct-monthly-sheet .month-groups th:not(:first-child) { border-left: 2px solid #e2def8; }
-.direct-monthly-sheet .sheet-card-head { min-width: 276px; width: 276px; left: 0; z-index: 5; text-align: left; }
+.direct-monthly-sheet .sheet-card-head { min-width: 160px; width: 160px; left: 0; z-index: 5; text-align: left; }
+.direct-monthly-sheet .sheet-card-subhead { position: sticky; left: 160px; z-index: 5; min-width: 116px; width: 116px; text-align: left; background: #f3f5f9 !important; color: #596577 !important; border-left: 1px solid #e6e9ef !important; }
 .direct-monthly-sheet .sheet-card-name { position: sticky; left: 0; z-index: 2; min-width: 160px; width: 160px; max-width: 160px; text-align: left; white-space: normal; vertical-align: middle; background: #f8f9fc; box-shadow: 3px 0 6px #2935490a; }
 .direct-monthly-sheet .sheet-card-name strong,.direct-monthly-sheet .sheet-card-name span,.direct-monthly-sheet .sheet-card-name small { display: block; }
 .direct-monthly-sheet .sheet-card-name strong { color: #364154; font-size: 10px; }
