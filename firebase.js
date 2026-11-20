@@ -29,7 +29,7 @@ export async function loadCloudState(uid) {
   if (auth.currentUser?.uid !== uid) throw new Error("The signed-in account changed before its data loaded.");
   const collectionSnapshots = await Promise.all(dataCollections.map((name) => getDocs(collection(db, "users", uid, name))));
   const profileSnapshot = await getDoc(doc(db, "users", uid, "settings", "profile"));
-  const state = { currency: profileSnapshot.exists() ? profileSnapshot.data().currency : "USD" };
+  const state = { currency: profileSnapshot.exists() ? profileSnapshot.data().currency : "PHP" };
   collectionSnapshots.forEach((snapshot, index) => {
     state[dataCollections[index]] = snapshot.docs.map((record) => ({ ...record.data(), id: record.id }));
   });

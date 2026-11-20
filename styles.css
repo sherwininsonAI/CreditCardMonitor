@@ -140,6 +140,7 @@ h1 { font: 700 25px "Segoe UI",Arial,sans-serif; letter-spacing: -.7px; margin: 
 .legend-dot.paid { background: #258f6b; }
 .chart-filter-caption { margin-left: auto; color: #687385; font-weight: 600; }
 .chart-filter-control { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: 0 0 auto; }
+.chart-panel-controls { display: flex; align-items: flex-end; gap: 8px; }
 .chart-filter-control label { color: #687385; font-size: 9px; font-weight: 600; }
 .chart-filter-control select { width: 150px; max-width: 30vw; min-width: 110px; padding: 6px 22px 6px 8px; border: 1px solid #e5e8ef; border-radius: 6px; background: #fff; color: #596577; font-size: 10px; }
 .line-chart-panel { margin-top: 14px; }
@@ -318,6 +319,7 @@ td strong { color: #384456; font-weight: 600; }
 .direct-monthly-sheet .sheet-total-row .sheet-row-label { left: 0; z-index: 4; min-width: 276px; width: 276px; }
 .direct-monthly-sheet .sheet-total-row td { min-width: 120px; }
 .direct-monthly-sheet .sheet-total-row th,.direct-monthly-sheet .sheet-total-row td { position: static; }
+.direct-monthly-sheet .sheet-total-row .sheet-row-label { position: sticky; left: 0; bottom: auto; z-index: 4; }
 .monthly-sheet-view-mode .page-heading .page-subtitle { display: none; }
 .monthly-sheet-view-mode .direct-monthly-sheet .sheet-data-row th,.monthly-sheet-view-mode .direct-monthly-sheet .sheet-data-row td { height: 21px; padding: 1px 4px; font-size: 8px; }
 .monthly-sheet-view-mode .direct-monthly-sheet .sheet-card-name strong { font-size: 9px; }
@@ -361,6 +363,8 @@ td strong { color: #384456; font-weight: 600; }
   .cards-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 740px) {
+  .overview-grid .panel:first-child .panel-header { align-items: flex-start; flex-wrap: wrap; }
+  .chart-panel-controls { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
   .sidebar { width: auto; height: 60px; inset: auto 0 0; border-right: 0; border-top: 1px solid #e9edf3; padding: 0 8px; display: block; }
   .brand,.workspace-label,.nav-divider,.nav-caption,.sidebar-bottom { display: none; }
   .main-nav { height: 100%; display: flex; flex-direction: row; align-items: center; justify-content: space-around; gap: 2px; }

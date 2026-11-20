@@ -16,14 +16,14 @@ Serve the project through Firebase Hosting (see **Firebase setup** below). The a
 - Record payments and associate charges/payments with a person.
 - Calculate outstanding balances as recorded charges minus recorded payments.
 - View monthly or yearly spending reports, including purchase-date, statement-date, and due-date totals.
-- Compare monthly card amount-due and payment totals in a grouped bar chart and a line graph, with paid-versus-due percentages and exact values plus the unpaid gap on hover/focus. Each graph has its own all-cards or per-card filter, saved for the current browser session. The dashboard card list shows current balance versus remaining credit as a pie chart for each card.
+- Compare monthly card amount-due and payment totals in a grouped bar chart and a line graph, with paid-versus-due percentages and exact values plus the unpaid gap on hover/focus. Rank the bar chart months from highest to lowest by amount due or payments; the line graph stays in calendar order. Each graph has its own all-cards or per-card filter, saved for the current browser session. The dashboard card list shows current balance versus remaining credit as a pie chart for each card.
 - View all 12 months in a spreadsheet-style card summary with due dates, billed amounts, payments, and estimated remaining amounts; export the sheet as a CSV for Excel.
 - Filter the monthly card sheet by card name; the selected card filter is kept in browser session storage across refreshes in the same session, and totals/export follow the selected card.
 - Due dates turn green and their warning icon is hidden when a payment is recorded for that billing cycle, including payments made before or after the due date.
 - Open the compact monthly card and salary sheets positioned at the current month, while keeping the January–December column order and preserving your horizontal position during sheet edits.
 - Switch the monthly credit-card sheet between editable entry mode and a compact, read-only view of card details by month; the selected mode is remembered for the current browser session. View mode hides salary details and entry controls.
 - View salary totals for each person's two pay cutoffs by month and year on the monthly sheet; recorded income is reflected in the dashboard.
-- Change the display currency from the top bar.
+- Change the display currency from the top bar; PHP is the default.
 
 ## Data and privacy
 
@@ -71,10 +71,10 @@ Spreadsheet files and OCR both run in-browser; the statement file and extracted 
 
 For each card, set the statement day and the number of days after the statement date that payment is due. Due dates are calculated using the calendar month and can fall in the following month. Existing cards with only a saved due day receive an estimated days-after value when edited; confirm that estimate with the card issuer.
 
-The balance is a simple calculation from entries you record. It does not include unentered interest, fees, refunds, or pending bank transactions.
+The balance is calculated from recorded charges or monthly amounts minus recorded payments. Monthly interest is shown as a reference only and does not affect the balance. The balance does not include fees, refunds, or pending bank transactions.
 
 The monthly card sheet shows a single card total and combined payment for each month. If no direct monthly value has been entered, it uses dated transactions due that month and payments made that month as the starting values.
 
-You can skip daily transactions and enter one monthly card amount and one combined monthly payment per card directly in the Jan–Dec sheet, along with a due date and optional interest. The dashboard links directly to this workflow and defaults to monthly due-date totals. The sheet calculates each month's balance as amount + interest − payment and shows separate all-card monthly totals for amount due, payments, and balance. A value entered directly in a card/month cell replaces the dated transaction or payment total for that card/month in balance calculations.
+You can skip daily transactions and enter one monthly card amount and one combined monthly payment per card directly in the Jan–Dec sheet, along with a due date and optional interest reference. The dashboard links directly to this workflow and defaults to monthly due-date totals. The sheet calculates each month's balance as amount − payment and shows separate all-card monthly totals for amount due, payments, and balance. Interest is displayed separately for reference and does not affect balances. A value entered directly in a card/month cell replaces the dated transaction or payment total for that card/month in balance calculations.
 
 Salary is recorded as actual amounts per person and month: the 15th cutoff covers days 1–15, and the 30th cutoff covers day 16 through the end of that month. The second cutoff uses the calendar month's last day (including February 28 or 29). A person's usual monthly salary is optional reference information and is not used to calculate income reports.

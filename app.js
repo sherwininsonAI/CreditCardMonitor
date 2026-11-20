@@ -16,7 +16,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   const STORAGE_KEY = "ledgerly.credit-monitor.v1";
-  const blankFinanceState = () => ({ cards: [], people: [], transactions: [], payments: [], incomes: [], monthlyStatements: [], currency: "USD" });
+  const blankFinanceState = () => ({ cards: [], people: [], transactions: [], payments: [], incomes: [], monthlyStatements: [], currency: "PHP" });
   const pageTitles = {
     dashboard: "Overview",
     monthly: "Monthly sheet",
@@ -40,6 +40,7 @@ import {
   let monthlyCardFilterId = sessionStorage.getItem("ledgerly.monthly-card-filter") || "";
   let monthlySheetViewMode = sessionStorage.getItem("ledgerly.monthly-sheet-view-mode") === "view" ? "view" : "edit";
   let dashboardChartCardFilterId = sessionStorage.getItem("ledgerly.dashboard-chart-card-filter") || "";
+  let dashboardChartSortBy = sessionStorage.getItem("ledgerly.dashboard-chart-sort") === "paid" ? "paid" : "due";
   let dashboardLineChartCardFilterId = sessionStorage.getItem("ledgerly.dashboard-line-chart-card-filter") || "";
   let periodMonth = currentMonth;
   let periodMode = "month";
@@ -70,7 +71,7 @@ import {
       payments: Array.isArray(parsed.payments) ? parsed.payments : [],
       incomes: Array.isArray(parsed.incomes) ? parsed.incomes : [],
       monthlyStatements: Array.isArray(parsed.monthlyStatements) ? parsed.monthlyStatements : [],
-      currency: ["USD", "PHP", "EUR", "GBP", "CAD", "AUD", "INR", "SGD"].includes(parsed.currency) ? parsed.currency : "USD"
+      currency: ["USD", "PHP", "EUR", "GBP", "CAD", "AUD", "INR", "SGD"].includes(parsed.currency) ? parsed.currency : "PHP"
     };
   }
 
@@ -315,7 +316,8 @@ import {
     const dueDate = statement && Object.prototype.hasOwnProperty.call(statement, "dueDate")
       ? statement.dueDate : generatedDate;
     const interest = statement ? Number(statement.interest || 0) : 0;
-    return { month, dueDate, dueAmount, paid, interest, balance: dueAmount + interest - paid, stillDue: Math.max(dueAmount + interest - paid, 0) };
+    const balance = dueAmount - paid;
+    return { month, dueDate, dueAmount, paid, interest, balance, stillDue: Math.max(balance, 0) };
   }
 
   function hasPaymentForDueDate(cardId, dueDate) {
@@ -381,7 +383,6 @@ import {
     const payments = state.payments.filter((item) => item.cardId === card.id).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     let chargeAdjustment = 0;
     let paymentAdjustment = 0;
-    let interest = 0;
     state.monthlyStatements.filter((statement) => statement.cardId === card.id).forEach((statement) => {
       if (Object.prototype.hasOwnProperty.call(statement, "amountDue")) {
         const legacyDue = selectedTotal(state.transactions.filter((item) => item.cardId === card.id), "dueDate", statement.month);
@@ -391,11 +392,10 @@ import {
         const legacyPayment = selectedTotal(state.payments.filter((item) => item.cardId === card.id), "paymentDate", statement.month);
         paymentAdjustment += Number(statement.payment || 0) - legacyPayment;
       }
-      interest += Number(statement.interest || 0);
     });
     const adjustedCharges = charges + chargeAdjustment;
     const adjustedPayments = payments + paymentAdjustment;
-    return { charges: adjustedCharges, payments: adjustedPayments, balance: adjustedCharges + interest - adjustedPayments };
+    return { charges: adjustedCharges, payments: adjustedPayments, balance: adjustedCharges - adjustedPayments };
   }
 
   function toast(message, error) {
@@ -660,7 +660,7 @@ import {
     const cards = `<div class="cards-grid">
       <div class="metric-card"><div class="metric-top"><span class="metric-label">SPENDING ${periodMode === "year" ? "THIS YEAR" : "THIS MONTH"}</span><span class="metric-icon violet">↗</span></div><div class="metric-value">${money(periodSpend)}</div><div class="metric-foot">Based on ${basisName}</div></div>
       <div class="metric-card"><div class="metric-top"><span class="metric-label">PAYMENTS ${periodMode === "year" ? "THIS YEAR" : "THIS MONTH"}</span><span class="metric-icon green">↙</span></div><div class="metric-value">${money(periodPayments)}</div><div class="metric-foot">Payments recorded in ${periodLabel}</div></div>
-      <div class="metric-card"><div class="metric-top"><span class="metric-label">CURRENT BALANCE</span><span class="metric-icon amber">◷</span></div><div class="metric-value">${money(balance)}</div><div class="metric-foot">Monthly totals + interest − payments</div></div>
+      <div class="metric-card"><div class="metric-top"><span class="metric-label">CURRENT BALANCE</span><span class="metric-icon amber">◷</span></div><div class="metric-value">${money(balance)}</div><div class="metric-foot">Recorded amounts − payments</div></div>
       <div class="metric-card"><div class="metric-top"><span class="metric-label">${periodMode === "year" ? "YEARLY INCOME" : "INCOME THIS MONTH"}</span><span class="metric-icon blue">♙</span></div><div class="metric-value">${money(recordedIncome)}</div><div class="metric-foot">Recorded 15th and 30th cutoff salaries</div></div>
     </div>`;
     const chart = renderChart();
@@ -679,7 +679,7 @@ import {
     return `${pageHeading("Your overview", "A clear picture of your cards, spending and payments.", actions)}
       <div class="period-controls" style="margin-bottom:14px"><select id="dashboard-period" aria-label="Report period"><option value="month" ${periodMode === "month" ? "selected" : ""}>Monthly report</option><option value="year" ${periodMode === "year" ? "selected" : ""}>Yearly report</option></select>${periodMode === "year" ? `<select id="dashboard-year" aria-label="Report year">${yearOptions(reportYear)}</select>` : `<select id="dashboard-month" aria-label="Report month">${monthOptions(periodMonth)}</select>`}<select id="report-basis" aria-label="Report date basis"><option value="purchaseDate" ${reportBasis === "purchaseDate" ? "selected" : ""}>By purchase date</option><option value="statementDate" ${reportBasis === "statementDate" ? "selected" : ""}>By statement date</option><option value="dueDate" ${reportBasis === "dueDate" ? "selected" : ""}>By due date</option></select></div>
       ${cards}
-      <div class="overview-grid"><section class="panel"><div class="panel-header"><div><h2 class="panel-title">Monthly due vs payment</h2><div class="panel-caption">${periodMode === "year" ? `${reportYear} · monthly totals` : "Last 6 months · compare amount due with payments"}</div></div><div class="chart-filter-control"><label for="dashboard-chart-card-filter">Credit card</label><select id="dashboard-chart-card-filter" aria-label="Filter monthly graph by credit card">${chartCardFilterOptions()}</select></div></div><div class="panel-body">${chart}</div></section>
+      <div class="overview-grid"><section class="panel"><div class="panel-header"><div><h2 class="panel-title">Monthly due vs payment</h2><div class="panel-caption">${periodMode === "year" ? `${reportYear} · months ranked high to low` : "Last 6 months · months ranked high to low"}</div></div><div class="chart-panel-controls"><div class="chart-filter-control"><label for="dashboard-chart-sort">Rank months by</label><select id="dashboard-chart-sort" aria-label="Rank months by amount due or payments"><option value="due" ${dashboardChartSortBy === "due" ? "selected" : ""}>Amount due</option><option value="paid" ${dashboardChartSortBy === "paid" ? "selected" : ""}>Payments</option></select></div><div class="chart-filter-control"><label for="dashboard-chart-card-filter">Credit card</label><select id="dashboard-chart-card-filter" aria-label="Filter monthly graph by credit card">${chartCardFilterOptions()}</select></div></div></div><div class="panel-body">${chart}</div></section>
       <section class="panel"><div class="panel-header"><div><h2 class="panel-title">Credit limit vs actual use</h2><div class="panel-caption">Current outstanding balance compared with each card limit</div></div><button class="icon-button" data-page="cards">Manage →</button></div><div class="panel-body">${cardList}</div></section></div>
       <section class="panel line-chart-panel"><div class="panel-header"><div><h2 class="panel-title">Payment vs due amount by month</h2><div class="panel-caption">${periodMode === "year" ? `${reportYear} · monthly trend` : "Last 6 months · hover or focus a point to see how much remains unpaid"}</div></div><div class="chart-filter-control"><label for="dashboard-line-chart-card-filter">Credit card</label><select id="dashboard-line-chart-card-filter" aria-label="Filter line graph by credit card">${lineChartCardFilterOptions()}</select></div></div><div class="panel-body">${renderDuePaymentLineChart()}</div></section>
       <section class="panel table-panel"><div class="panel-header"><div><h2 class="panel-title">Recent transactions</h2><div class="panel-caption">Latest recorded card activity</div></div><button class="button small" data-page="transactions">View all →</button></div><div class="table-wrap"><table><thead><tr><th class="table-first">DESCRIPTION</th><th>CARD</th><th>PURCHASE DATE</th><th>DUE DATE</th><th>AMOUNT</th></tr></thead><tbody>${recentRows}</tbody></table></div></section>`;
@@ -731,7 +731,8 @@ import {
   }
 
   function renderChart() {
-    const months = monthlyDuePaymentData();
+    const months = monthlyDuePaymentData().sort((first, second) =>
+      second[dashboardChartSortBy] - first[dashboardChartSortBy] || first.value.localeCompare(second.value));
     const max = Math.max(...months.flatMap((item) => [item.due, item.paid]), 1);
     const chartBars = (item) => {
       const dueHeight = item.due > 0 ? Math.max(item.due / max * 140, 2) : 0;
@@ -820,9 +821,9 @@ import {
           const dueStatus = dueDateStatusClass(data.dueDate, data.paid > 0 || hasPaymentForDueDate(card.id, data.dueDate));
           return `<td class="sheet-month-start${currentMonthClass(month)} ${dueStatus}">${isViewMode ? `<span class="sheet-view-date">${formatDate(data.dueDate)}</span>${dueDateInfoIcon(dueStatus)}` : `<div class="sheet-due-date-control"><input class="sheet-edit-input sheet-date-input" type="date" aria-label="${escapeHtml(card.name)} ${month.label} due date" data-month-edit="dueDate" data-card-id="${escapeHtml(card.id)}" data-month="${data.month}" value="${escapeHtml(data.dueDate)}">${dueDateInfoIcon(dueStatus)}</div>`}</td>`;
         }).join("")}<td class="sheet-annual-value">—</td></tr>`,
-        `<tr class="sheet-data-row sheet-card-end"><th class="sheet-row-label">Interest</th>${months.map((month) => {
+        `<tr class="sheet-data-row sheet-card-end"><th class="sheet-row-label">Interest (reference)</th>${months.map((month) => {
           const data = cardMonthData(card, reportYear, month.index);
-          return `<td class="sheet-month-start sheet-number${currentMonthClass(month)}">${isViewMode ? (data.interest ? money(data.interest) : "—") : `<input class="sheet-edit-input" type="number" min="0" step="0.01" aria-label="${escapeHtml(card.name)} ${month.label} interest" data-month-edit="interest" data-card-id="${escapeHtml(card.id)}" data-month="${data.month}" value="${data.interest || ""}" placeholder="0.00">`}</td>`;
+          return `<td class="sheet-month-start sheet-number${currentMonthClass(month)}">${isViewMode ? (data.interest ? money(data.interest) : "—") : `<input class="sheet-edit-input" type="number" min="0" step="0.01" aria-label="${escapeHtml(card.name)} ${month.label} interest reference" data-month-edit="interest" data-card-id="${escapeHtml(card.id)}" data-month="${data.month}" value="${data.interest || ""}" placeholder="0.00">`}</td>`;
         }).join("")}<td class="sheet-annual-value">${money(sums.interest)}</td></tr>`
       ];
       return statementRows.join("");
@@ -859,7 +860,7 @@ import {
     return `${pageHeading("Monthly credit card sheet", isViewMode ? `Read-only card details by month.` : `A Jan–Dec spreadsheet view of each card’s due date, bill amount, payments and estimated amount still due.`, actions)}
       <div class="sheet-toolbar"><div class="period-controls"><label for="monthly-sheet-year">Report year</label>${yearSelector}<label for="monthly-sheet-card-filter">Credit card</label>${cardFilter}<button class="button small sheet-view-toggle" id="monthly-sheet-view-toggle" type="button" aria-pressed="${isViewMode}">${isViewMode ? "Edit mode" : "View mode"}</button></div><span class="sheet-tip">Opens at ${new Intl.DateTimeFormat(undefined, { month: "long" }).format(today)} · scroll sideways to view other months. Frozen card details stay in view.</span></div>
       <section class="panel sheet-panel"><div class="sheet-scroll"><table class="monthly-sheet direct-monthly-sheet"><thead><tr class="month-groups"><th class="sheet-card-head" colspan="2">CREDIT CARD / MONTHLY DETAIL</th>${monthHeaders}<th>YEAR TOTAL</th></tr></thead><tbody>${cardRows || empty}${cardRows ? totalsRow : ""}</tbody></table></div></section>
-      ${isViewMode ? "" : `<div class="report-note"><strong>Fast monthly entry:</strong> type the month's total card amount, total payment, due date, and optional interest directly into the cells. You do not need a separate transaction for every date. Payment is one monthly total per card; it is not split by person. Balance is calculated as monthly amount + interest − payment. Existing dated transactions and payments are used as the starting totals until you edit that month here.</div>
+      ${isViewMode ? "" : `<div class="report-note"><strong>Fast monthly entry:</strong> type the month's total card amount, total payment, due date, and optional interest reference directly into the cells. You do not need a separate transaction for every date. Payment is one monthly total per card; it is not split by person. Balance is calculated as monthly amount − payment; interest is displayed for reference only. Existing dated transactions and payments are used as the starting totals until you edit that month here.</div>
       <div class="sheet-section-heading"><div><h2>Salary by cutoff</h2><p>Enter each month's actual salary separately. 15th covers the first cutoff; 30th covers the second cutoff (including the last day of shorter months).</p></div><button class="button primary" data-action="${state.people.length ? "add-income" : "add-person"}">＋ ${state.people.length ? "Record salary" : "Add person"}</button></div>
       <section class="panel sheet-panel"><div class="sheet-scroll"><table class="monthly-sheet income-sheet"><thead><tr class="month-groups"><th class="sheet-card-head" rowspan="2">PERSON</th>${months.map((month) => `<th class="${month.index === today.getMonth() ? "current-month-column" : ""}" colspan="3">${month.label}</th>`).join("")}<th rowspan="2">YEAR TOTAL</th></tr><tr class="month-columns">${incomeColumns}</tr></thead><tbody>${incomePeople || incomeEmpty}${incomePeople ? incomeTotalRow : ""}</tbody></table></div></section>`}`;
   }
@@ -874,9 +875,9 @@ import {
     const rows = [["Credit card", "Bank", "Last 4 digits", "Credit limit", "Current calculated balance"]];
     for (let index = 0; index < 12; index += 1) {
       const label = new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date(reportYear, index, 1));
-      rows[0].push(`${label} amount / total`, `${label} payment total`, `${label} balance`, `${label} due date`, `${label} interest`);
+      rows[0].push(`${label} amount / total`, `${label} payment total`, `${label} balance`, `${label} due date`, `${label} interest reference`);
     }
-    rows[0].push("Year total amount", "Year total payments", "Year total interest", "Year total balance");
+    rows[0].push("Year total amount", "Year total payments", "Year total interest reference", "Year total balance");
     displayedMonthlyCards().forEach((card) => {
       const row = [card.name, card.bank, card.last4 || "", Number(card.limit || 0), cardTotals(card).balance];
       for (let index = 0; index < 12; index += 1) {
@@ -1751,6 +1752,12 @@ import {
       dashboardChartCardFilterId = dashboardChartCardFilter.value;
       if (dashboardChartCardFilterId) sessionStorage.setItem("ledgerly.dashboard-chart-card-filter", dashboardChartCardFilterId);
       else sessionStorage.removeItem("ledgerly.dashboard-chart-card-filter");
+      render();
+    });
+    const dashboardChartSort = document.getElementById("dashboard-chart-sort");
+    if (dashboardChartSort) dashboardChartSort.addEventListener("change", () => {
+      dashboardChartSortBy = dashboardChartSort.value === "paid" ? "paid" : "due";
+      sessionStorage.setItem("ledgerly.dashboard-chart-sort", dashboardChartSortBy);
       render();
     });
     const dashboardLineChartCardFilter = document.getElementById("dashboard-line-chart-card-filter");
