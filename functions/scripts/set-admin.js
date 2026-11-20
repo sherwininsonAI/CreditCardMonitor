@@ -17,6 +17,7 @@ if (!email || !projectId) {
   }).catch((error) => {
     if (error.code === "auth/invalid-email") {
       console.error("Invalid email argument. Use node scripts/set-admin.js sherwin.inson.ai@gmail.com or node scripts/set-admin.js --email sherwin.inson.ai@gmail.com.");
+      console.error("Invalid email argument. Use node scripts/set-admin.js sherwin.inson.ai.2@gmail.com or node scripts/set-admin.js --email sherwin.inson.ai.2@gmail.com.");
     } else if (error.code === "auth/user-not-found") {
       console.error("No Firebase Authentication user exists for that email. Create the user in Firebase Console first.");
     } else if (/default credentials|Could not load the default credentials/i.test(error.message || "")) {
